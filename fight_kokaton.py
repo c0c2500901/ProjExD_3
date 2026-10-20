@@ -1,4 +1,3 @@
-
 import os
 import random
 import sys
@@ -7,9 +6,9 @@ import time
 import pygame as pg
 
 
-WIDTH = 1100  # ゲームウィンドウの幅
-HEIGHT = 650  # ゲームウィンドウの高さ
-NUM_OF_BOMBS = 5  # 爆弾の個数
+WIDTH = 1100
+HEIGHT = 650
+NUM_OF_BOMBS = 5
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -54,7 +53,7 @@ class Bird:
 
     def __init__(self, xy: tuple[int, int]):
         """こうかとん画像を生成する"""
-        self.img = __class__.imgs[(+5, 0)]
+        self.img = Bird.imgs[(+5, 0)]
         self.rct: pg.Rect = self.img.get_rect()
         self.rct.center = xy
 
@@ -65,11 +64,11 @@ class Bird:
         )
         screen.blit(self.img, self.rct)
 
-    def update(self, key_lst: list[bool], screen: pg.Surface):
-        """押されたキーに応じてこうかとんを移動させる"""
+    def update(self, key_lst, screen: pg.Surface):
+        """こうかとんを移動させて表示する"""
         sum_mv = [0, 0]
 
-        for k, mv in __class__.delta.items():
+        for k, mv in Bird.delta.items():
             if key_lst[k]:
                 sum_mv[0] += mv[0]
                 sum_mv[1] += mv[1]
@@ -80,7 +79,7 @@ class Bird:
             self.rct.move_ip(-sum_mv[0], -sum_mv[1])
 
         if sum_mv != [0, 0]:
-            self.img = __class__.imgs[tuple(sum_mv)]
+            self.img = Bird.imgs[tuple(sum_mv)]
 
         screen.blit(self.img, self.rct)
 
@@ -88,7 +87,7 @@ class Bird:
 class Beam:
     """こうかとんが放つビームに関するクラス"""
 
-    def __init__(self, bird: "Bird"):
+    def __init__(self, bird: Bird):
         """ビーム画像を生成する"""
         self.img = pg.image.load("fig/beam.png")
         self.rct = self.img.get_rect()
@@ -97,10 +96,9 @@ class Beam:
         self.vx, self.vy = +5, 0
 
     def update(self, screen: pg.Surface):
-        """ビームを移動させて画面に表示する"""
-        if check_bound(self.rct) == (True, True):
-            self.rct.move_ip(self.vx, self.vy)
-            screen.blit(self.img, self.rct)
+        """ビームを移動させて表示する"""
+        self.rct.move_ip(self.vx, self.vy)
+        screen.blit(self.img, self.rct)
 
 
 class Bomb:
@@ -113,13 +111,13 @@ class Bomb:
         self.img.set_colorkey((0, 0, 0))
         self.rct = self.img.get_rect()
         self.rct.center = (
-            random.randint(0, WIDTH),
-            random.randint(0, HEIGHT),
+            random.randint(rad, WIDTH - rad),
+            random.randint(rad, HEIGHT - rad),
         )
         self.vx, self.vy = +5, +5
 
     def update(self, screen: pg.Surface):
-        """爆弾を移動させて画面に表示する"""
+        """爆弾を移動させて表示する"""
         yoko, tate = check_bound(self.rct)
 
         if not yoko:
@@ -130,11 +128,11 @@ class Bomb:
         self.rct.move_ip(self.vx, self.vy)
         screen.blit(self.img, self.rct)
 
+
 class Score:
     """スコア表示に関するクラス"""
 
     def __init__(self):
-        """スコアの初期設定"""
         self.fonto = pg.font.Font(None, 50)
         self.color = (0, 0, 255)
         self.score = 0
@@ -145,7 +143,7 @@ class Score:
         self.rct.center = (100, HEIGHT - 50)
 
     def update(self, screen: pg.Surface):
-        """スコアを画面に表示する"""
+        """スコアを表示する"""
         self.img = self.fonto.render(
             f"Score: {self.score}", 0, self.color
         )
@@ -159,11 +157,12 @@ def main():
 
     bird = Bird((300, 200))
     score = Score()
+
     bombs = [
         Bomb((255, 0, 0), 10)
         for _ in range(NUM_OF_BOMBS)
     ]
-    beam = None
+    beams = []
 
     fonto = pg.font.Font(None, 80)
     clock = pg.time.Clock()
@@ -173,9 +172,13 @@ def main():
             if event.type == pg.QUIT:
                 return
 
-            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beam = Beam(bird)
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_ESCAPE:
+                    return
+                if event.key == pg.K_SPACE:
+                    beams.append(Beam(bird))
 
+        # 背景を表示する
         screen.blit(bg_img, [0, 0])
 
         # こうかとんと爆弾の衝突判定
@@ -190,40 +193,64 @@ def main():
                     txt,
                     [WIDTH // 2 - 150, HEIGHT // 2],
                 )
-                
+
                 pg.display.update()
                 time.sleep(1)
                 return
 
         # ビームと爆弾の衝突判定
-            if beam is not None:
-                for i, bomb in enumerate(bombs):
-                    if beam.rct.colliderect(bomb.rct):
-                        score.score += 1  # スコアを1点加算
-                        bombs[i] = None
-                        beam = None
-                        bird.change_img(6, screen)
-                        break
+        hit_beams = []
+        hit_bombs = []
 
-        
+        for beam in beams:
+            for bomb in bombs:
+                if (
+                    beam not in hit_beams
+                    and bomb not in hit_bombs
+                    and beam.rct.colliderect(bomb.rct)
+                ):
+                    score.score += 1
+                    hit_beams.append(beam)
+                    hit_bombs.append(bomb)
+                    bird.change_img(6, screen)
+                    break
 
-        # 消えた爆弾をリストから取り除く
-        bombs = [
-            bomb for bomb in bombs
-            if bomb is not None
+        # 命中したビームだけを取り除く
+        beams = [
+            beam for beam in beams
+            if beam not in hit_beams
         ]
 
+        # 命中した爆弾だけを取り除く
+        bombs = [
+            bomb for bomb in bombs
+            if bomb not in hit_bombs
+        ]
+
+        # 全爆弾を撃ち落としたら終了
+        if len(bombs) == 0:
+            return
+
+        # こうかとんを更新する
         key_lst = pg.key.get_pressed()
         bird.update(key_lst, screen)
 
-        if beam is not None:
+        # ビームを更新して画面外のものを削除
+        for beam in beams:
             beam.update(screen)
+
+        beams = [
+            beam for beam in beams
+            if check_bound(beam.rct) == (True, True)
+        ]
 
         # 爆弾を更新する
         for bomb in bombs:
             bomb.update(screen)
 
+        # スコアを表示する
         score.update(screen)
+
         pg.display.update()
         clock.tick(50)
 
@@ -232,4 +259,4 @@ if __name__ == "__main__":
     pg.init()
     main()
     pg.quit()
-    sys.exit()
+    sys.exit()  
