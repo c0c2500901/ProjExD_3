@@ -107,7 +107,7 @@ class Bomb:
     """爆弾に関するクラス"""
 
     def __init__(self, color: tuple[int, int, int], rad: int):
-        """爆弾円を生成する"""
+        """爆弾を生成する"""
         self.img = pg.Surface((2 * rad, 2 * rad))
         pg.draw.circle(self.img, color, (rad, rad), rad)
         self.img.set_colorkey((0, 0, 0))
@@ -130,6 +130,27 @@ class Bomb:
         self.rct.move_ip(self.vx, self.vy)
         screen.blit(self.img, self.rct)
 
+class Score:
+    """スコア表示に関するクラス"""
+
+    def __init__(self):
+        """スコアの初期設定"""
+        self.fonto = pg.font.Font(None, 50)
+        self.color = (0, 0, 255)
+        self.score = 0
+        self.img = self.fonto.render(
+            f"Score: {self.score}", 0, self.color
+        )
+        self.rct = self.img.get_rect()
+        self.rct.center = (100, HEIGHT - 50)
+
+    def update(self, screen: pg.Surface):
+        """スコアを画面に表示する"""
+        self.img = self.fonto.render(
+            f"Score: {self.score}", 0, self.color
+        )
+        screen.blit(self.img, self.rct)
+
 
 def main():
     pg.display.set_caption("たたかえ！こうかとん")
@@ -137,6 +158,7 @@ def main():
     bg_img = pg.image.load("fig/pg_bg.jpg")
 
     bird = Bird((300, 200))
+    score = Score()
     bombs = [
         Bomb((255, 0, 0), 10)
         for _ in range(NUM_OF_BOMBS)
@@ -168,19 +190,22 @@ def main():
                     txt,
                     [WIDTH // 2 - 150, HEIGHT // 2],
                 )
-
+                
                 pg.display.update()
                 time.sleep(1)
                 return
 
         # ビームと爆弾の衝突判定
-        if beam is not None:
-            for i, bomb in enumerate(bombs):
-                if beam.rct.colliderect(bomb.rct):
-                    bombs[i] = None
-                    beam = None
-                    bird.change_img(6, screen)
-                    break
+            if beam is not None:
+                for i, bomb in enumerate(bombs):
+                    if beam.rct.colliderect(bomb.rct):
+                        score.score += 1  # スコアを1点加算
+                        bombs[i] = None
+                        beam = None
+                        bird.change_img(6, screen)
+                        break
+
+        
 
         # 消えた爆弾をリストから取り除く
         bombs = [
@@ -198,6 +223,7 @@ def main():
         for bomb in bombs:
             bomb.update(screen)
 
+        score.update(screen)
         pg.display.update()
         clock.tick(50)
 
